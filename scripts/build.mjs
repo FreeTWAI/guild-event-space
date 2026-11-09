@@ -4,21 +4,32 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 
 const actions = ['skills', 'tools', 'work', 'information'];
-const text = (value, maximum) => typeof value === 'string' && value.trim().length > 0 && value.length <= maximum && !/[\u0000-\u001f\u007f]/.test(value);
-const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+const invalidChars = /[\u0000-\u001f\u007f]/;
+const text = (value, maximum) => typeof value === 'string' && value.trim().length > 0 && value.length <= maximum && !invalidChars.test(value);
+const exact = (value, keys) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (Object.keys(value).length !== keys.length) return false;
+  for (let i = 0; i < keys.length; i++) {
+    if (!Object.hasOwn(value, keys[i])) return false;
+  }
+  return true;
+};
+const workspaceKeys = ['schema_version', 'guild_key', 'name', 'repository', 'headline', 'purpose', 'outcome', 'steps'];
+const stepKeys = ['title', 'detail', 'action'];
 export function validateWorkspace(value) {
-  if (!exact(value, ['schema_version', 'guild_key', 'name', 'repository', 'headline', 'purpose', 'outcome', 'steps'])
+  if (!exact(value, workspaceKeys)
     || value.schema_version !== 'freedom.guild-workspace/v1'
     || typeof value.guild_key !== 'string' || !/^guild_[a-z0-9_]{1,80}$/.test(value.guild_key)
     || typeof value.repository !== 'string' || !/^FreeTWAI\/guild-[a-z0-9-]{1,80}$/.test(value.repository)
     || !text(value.name, 120) || !text(value.headline, 160) || !text(value.purpose, 1200) || !text(value.outcome, 200)
     || !Array.isArray(value.steps) || value.steps.length < 2 || value.steps.length > 5
-    || value.steps.some(step => !exact(step, ['title', 'detail', 'action']) || !text(step.title, 100) || !text(step.detail, 300) || !actions.includes(step.action))) {
+    || value.steps.some(step => !exact(step, stepKeys) || !text(step.title, 100) || !text(step.detail, 300) || !actions.includes(step.action))) {
     throw new Error('Invalid workspace.json');
   }
   return value;
 }
-export const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
+const escapeMap = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
+export const escapeHtml = value => String(value).replace(/[&<>"']/g, char => escapeMap[char]);
 const href = (workspace, action) => `https://freetwai.com/#guilds/${workspace.guild_key}/${action}`;
 export function renderWorkspace(workspace) {
   validateWorkspace(workspace);

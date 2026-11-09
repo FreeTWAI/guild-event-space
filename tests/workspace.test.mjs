@@ -21,3 +21,12 @@ test('HTML content is escaped and cannot install scripts or links', () => {
 test('unsupported contracts, arbitrary URLs, commands, private fields, and oversized content fail', () => {
   for (const value of [null, [], {...workspace, schema_version: 'v2'}, {...workspace, token: 'not-a-secret'}, {...workspace, guild_key: '../outside'}, {...workspace, repository: 'attacker/guild-x'}, {...workspace, purpose: 'a'.repeat(1201)}, {...workspace, steps: [{title: 'test', detail: 'test', action: 'https://example.com'}]}, {...workspace, steps: workspace.steps.map(step => ({...step, action: 'join'}))}]) assert.throws(() => validateWorkspace(value));
 });
+test('renderWorkspace performance is within acceptable timeframe', () => {
+  const iterations = 10000;
+  const start = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    renderWorkspace(workspace);
+  }
+  const duration = performance.now() - start;
+  assert.ok(duration < 200, `renderWorkspace took ${duration}ms for ${iterations} iterations, exceeding 200ms limit`);
+});
